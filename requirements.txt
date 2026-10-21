@@ -1,0 +1,10 @@
+PyQt6>=6.6.0
+requests>=2.31.0
+aiohttp>=3.9.0
+yt-dlp>=2024.3.10
+cryptography>=42.0.0
+loguru>=0.7.0
+# aria2c 和 ffmpeg 是外部二进制,需要单独安装并加入 PATH
+# aria2c: https://github.com/aria2/aria2/releases
+# ffmpeg: https://www.gyan.dev/ffmpeg/builds/
+mitmproxy>=10.0.0

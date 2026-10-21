@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- 浅蓝渐变背景圆角矩形 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E5F1FF"/>
+      <stop offset="100%" stop-color="#CCE5FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="56" ry="56" fill="url(#bg)"/>
+
+  <!-- 下载箭头主体 -->
+  <line x1="128" y1="64" x2="128" y2="168"
+        stroke="#007AFF" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- 箭头头部(向下 V) -->
+  <polyline points="78,124 128,172 178,124"
+            stroke="#007AFF" stroke-width="14"
+            stroke-linecap="round" stroke-linejoin="round"
+            fill="none"/>
+
+  <!-- 底部托盘线 -->
+  <line x1="64" y1="204" x2="192" y2="204"
+        stroke="#007AFF" stroke-width="14" stroke-linecap="round"/>
+</svg>
