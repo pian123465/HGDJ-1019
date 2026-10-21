@@ -1,0 +1,95 @@
+name: Build Windows .exe
+
+on:
+  workflow_dispatch:  # 只在手动触发时运行(不自动推 Release)
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    # === Windows runner 编码 fix(v0.6)========================================
+    # PowerShell 7 (pwsh) 的 stdout 在 runner 上是 cp1252,
+    # 任何 Python 脚本 print 中文/emoji 都会 UnicodeEncodeError 把 step 搞挂。
+    # 这里是第一层保险(最早生效,连 python 启动参数都还没解析就有 utf-8 了)。
+    #
+    # v0.6 的变化:不再只靠这一层。
+    #   - 每个 python step 都加了 `-X utf8`(命令行参数,比 env 更硬,env 丢了也有效)
+    #   - 每个 run 块第一行再设一次 $env:PYTHONIOENCODING(step 级兜底)
+    #   - tools/setup_binaries.py 脚本自己也会 reconfigure(脚本级兜底)
+    # 三层里任何一层生效就不会再 UnicodeEncodeError。
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    # =========================================================================
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # [v0.6] 编码护栏:构建路径上的脚本不允许 print 非 ASCII。
+      # 故意放在最前面 —— 早失败、报错清楚,总比 PyInstaller 跑到一半炸掉强。
+      - name: Guard - no non-ASCII print in build scripts
+        shell: pwsh
+        run: |
+          $env:PYTHONIOENCODING = 'utf-8'
+          $env:PYTHONUTF8 = '1'
+          python -X utf8 tools/check_ascii_prints.py
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          $env:PYTHONIOENCODING = 'utf-8'
+          $env:PYTHONUTF8 = '1'
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Extract and check binaries (aria2c + ffmpeg)
+        # binaries.tar.gz is bundled in the repo (75MB, < 100MB single-file limit).
+        # setup_binaries.py extracts it on startup; only falls back to network
+        # download if extraction fails or binaries are missing.
+        #
+        # `-X utf8` 让 Python 直接进 UTF-8 模式,不依赖任何环境变量;
+        # setup_binaries.py 内部还会再 reconfigure 一次,双保险。
+        shell: pwsh
+        run: |
+          $env:PYTHONIOENCODING = 'utf-8'
+          $env:PYTHONUTF8 = '1'
+          python -X utf8 tools/setup_binaries.py
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "[ERROR] binary preparation failed; check assets/bin/binaries.tar.gz integrity"
+            exit 1
+          }
+
+      - name: Build .exe (PyInstaller)
+        # 同样用 `-X utf8` + `python -m PyInstaller`:
+        # shortdrama.spec 里也有 print(cp1252 下中文会炸),这里必须带上编码开关
+        shell: pwsh
+        run: |
+          $env:PYTHONIOENCODING = 'utf-8'
+          $env:PYTHONUTF8 = '1'
+          python -X utf8 -m PyInstaller shortdrama.spec --clean --noconfirm
+
+      - name: Verify artifact (embedded aria2 + ffmpeg)
+        shell: pwsh
+        run: |
+          dir dist\shortdrama-dl.exe
+          echo File size:
+          forfiles /p dist /m shortdrama-dl.exe /c "cmd /c echo @fsize"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shortdrama-dl-windows
+          path: dist\shortdrama-dl.exe
+          if-no-files-found: error
